@@ -22,9 +22,9 @@ TARGET_COURSE = "2 курс"
 CLOUD_URL = "https://cloud.pilot-ipek.ru/s/7HDT8FZGBd7J5cs"
 BASE_URL = "https://www.pilot-ipek.ru"
 API_URL = f"{BASE_URL}/api/get_list"
-CHECK_INTERVAL = 300
+CHECK_INTERVAL = 3600
 DAYS_AHEAD = 7
-CACHE_FILE = "schedule_cache.json"
+CACHE_FILE = "/app/data/schedule_cache.json"
 
 MONTHS_RU = {1: "января", 2: "февраля", 3: "марта", 4: "апреля", 5: "мая", 6: "июня", 7: "июля", 8: "августа", 9: "сентября", 10: "октября", 11: "ноября", 12: "декабря"}
 MONTHS_NOM_RU = {1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель", 5: "Май", 6: "Июнь", 7: "Июль", 8: "Август", 9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь"}
@@ -347,6 +347,9 @@ def build_new_snapshot():
         target = today + timedelta(days=i)
         key = target.strftime("%d.%m.%Y")
         lessons = make_snapshot_for_day(target)
+        if lessons is None:
+            logger.info("День " + key + " не удалось загрузить — пропускаем.")
+            continue
         if lessons:
             snapshot[key] = lessons
     return snapshot
@@ -364,17 +367,13 @@ def format_change_message(changes):
 
 def diff_snapshots(old, new):
     changes = []
-    all_keys = set(old.keys()) | set(new.keys())
-    for key in sorted(all_keys, key=lambda k: parse_date_key(k) or datetime.min):
+    for key in sorted(new.keys(), key=lambda k: parse_date_key(k) or datetime.min):
         old_l = old.get(key, [])
         new_l = new.get(key, [])
         if not old_l and new_l:
             changes.append("📆 " + key + " — появилось новое расписание")
             for les in new_l:
                 changes.append("   ✅ " + les)
-            continue
-        if old_l and not new_l:
-            changes.append("📆 " + key + " — расписание удалено")
             continue
         old_s = set(old_l)
         new_s = set(new_l)
