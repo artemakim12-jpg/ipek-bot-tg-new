@@ -371,28 +371,60 @@ def format_change_message(changes):
     return msg
 
 
+def lesson_to_str(lesson):
+    """Превращает словарь пары в строку для сравнения."""
+    return lesson["time"] + "|" + lesson["content"]
+
+
+def format_table_from_lessons(title_key, lessons):
+    """Красивое оформление дня — как в обычном расписании."""
+    lines = ["━━━━━━━━━━━━━━━━━", "📅 Расписание · " + TARGET_GROUP]
+    lines.append("📆 " + title_key)
+    lines.append("━━━━━━━━━━━━━━━━━")
+    lines.append("")
+    for les in lessons:
+        t = re.sub(r"\s+", " ", les["time"]).strip().replace(".", ":")
+        t = re.sub(r"(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})", r"\1 – \2", t)
+        lines.append("🔵 " + t)
+        parts = [p.strip() for p in les["content"].split(" / ") if p.strip()]
+        for i, part in enumerate(parts):
+            if i == 0:
+                lines.append("   📚 " + part)
+            elif i == len(parts) - 1 and len(parts) > 1:
+                lines.append("   🚪 " + part)
+            else:
+                lines.append("   👤 " + part)
+        lines.append("")
+    lines.append("━━━━━━━━━━━━━━━━━")
+    return "\n".join(lines)
+
+
 def diff_snapshots(old, new):
     changes = []
     for key in sorted(new.keys(), key=lambda k: parse_date_key(k) or datetime.min):
         old_l = old.get(key, [])
         new_l = new.get(key, [])
-        if not old_l and new_l:
-            changes.append("📆 " + key + " — Новое расписание")
-            for les in new_l:
-                changes.append("   ✅ " + les)
-            continue
-        old_s = set(old_l)
-        new_s = set(new_l)
+
+        
+        old_s = set(lesson_to_str(x) for x in old_l)
+        new_s = set(lesson_to_str(x) for x in new_l)
+
         if old_s == new_s:
             continue
-        added = new_s - old_s
-        removed = old_s - new_s
-        if added or removed:
-            changes.append("📆 " + key)
-            for r in sorted(removed):
-                changes.append("   ❌ Было: " + r)
-            for a in sorted(added):
-                changes.append("   ✅ Стало: " + a)
+
+        
+        if not old_l and new_l:
+            changes.append("📢 Появилось новое расписание!")
+            changes.append("")
+            changes.append(format_table_from_lessons(key, new_l))
+            changes.append("")
+            continue
+
+        
+        changes.append("📢 Изменения на " + key + ":")
+        changes.append("")
+        changes.append(format_table_from_lessons(key, new_l))
+        changes.append("")
     return changes
 
 
