@@ -321,17 +321,23 @@ def parse_schedule_for_date_text(dt_text):
 
 
 def make_snapshot_for_day(target):
-    tables = parse_schedule_for_date(target)
-    if not tables:
-        return []
-    lessons = tables[0]["lessons"]
-    result = []
-    for ti, content in lessons:
-        t = re.sub(r"\s+", " ", ti).strip()
-        c = re.sub(r"\s+", " ", content).strip()
-        result.append(t + "|" + c)
-    return result
-
+    import time
+    for attempt in range(3):
+        try:
+            tables = parse_schedule_for_date(target)
+        except Exception as e:
+            logger.error("Ошибка парсинга: " + str(e))
+            tables = []
+        if tables:
+            lessons = tables[0]["lessons"]
+            result = []
+            for ti, content in lessons:
+                t = re.sub(r"\s+", " ", ti).strip()
+                c = re.sub(r"\s+", " ", content).strip()
+                result.append({"time": t, "content": c})
+            return result
+        time.sleep(5)
+    return None
 
 def parse_date_key(key):
     try:
