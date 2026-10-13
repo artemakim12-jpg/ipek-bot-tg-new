@@ -44,13 +44,26 @@ schedule_snapshot = {}
 
 def load_cache():
     global schedule_snapshot, last_cloud_signature
+    
     if not os.path.exists(CACHE_FILE):
         logger.info("Файл кэша не найден — начинаем с нуля.")
         return
     try:
         with open(CACHE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        schedule_snapshot = data.get("schedule", {})
+        loaded = data.get("schedule", {})
+        
+        is_new_format = True
+        for day_key, lessons in loaded.items():
+            if lessons and isinstance(lessons[0], str):
+                is_new_format = False
+                break
+        if not is_new_format:
+            logger.info("Старый формат кэша — игнорируем, начинаем с нуля.")
+            schedule_snapshot = {}
+            last_cloud_signature = data.get("cloud_signature")
+            return
+        schedule_snapshot = loaded
         last_cloud_signature = data.get("cloud_signature")
         logger.info(f"Кэш загружен: {len(schedule_snapshot)} дней.")
     except Exception as e:
