@@ -377,7 +377,7 @@ def diff_snapshots(old, new):
         old_l = old.get(key, [])
         new_l = new.get(key, [])
         if not old_l and new_l:
-            changes.append("📆 " + key + " — Опа, новое расписание")
+            changes.append("📆 " + key + " — Новое расписание")
             for les in new_l:
                 changes.append("   ✅ " + les)
             continue
