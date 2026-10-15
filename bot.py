@@ -643,47 +643,46 @@ async def start_handler(message: Message):
 
 @dp.callback_query(lambda c: c.data == "main_menu")
 async def main_menu_cb(callback: CallbackQuery):
-    await callback.message.edit_text("👋 Главное меню. Группа " + TARGET_GROUP + ".", reply_markup=get_main_keyboard())
     await callback.answer()
+    await callback.message.edit_text("👋 Главное меню. Группа " + TARGET_GROUP + ".", reply_markup=get_main_keyboard())
 
 
 @dp.callback_query(lambda c: c.data == "open_calendar")
 async def open_calendar_cb(callback: CallbackQuery):
+    await callback.answer()
     months = await asyncio.to_thread(get_months_with_dates)
     if not months:
         await callback.message.edit_text("📭 Нет данных с сайта.", reply_markup=get_main_keyboard())
-        await callback.answer()
         return
     total = (len(months) + MONTHS_PER_PAGE - 1) // MONTHS_PER_PAGE
     await callback.message.edit_text("📅 Выберите месяц (страница 1 из " + str(total) + "):", reply_markup=get_months_keyboard(months, page=1))
-    await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("months_page:"))
 async def months_page_cb(callback: CallbackQuery):
+    await callback.answer()
     page = int(callback.data.split(":")[1])
     months = await asyncio.to_thread(get_months_with_dates)
     total = (len(months) + MONTHS_PER_PAGE - 1) // MONTHS_PER_PAGE
     await callback.message.edit_text("📅 Выберите месяц (страница " + str(page) + " из " + str(total) + "):", reply_markup=get_months_keyboard(months, page=page))
-    await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("month:"))
 async def month_cb(callback: CallbackQuery):
+    await callback.answer()
     mn = callback.data.split(":", 1)[1]
     data = await asyncio.to_thread(get_api_data)
     dates = data.get(mn, [])
     if not isinstance(dates, list) or not dates:
         await callback.message.edit_text("📭 В " + mn + " нет расписания.", reply_markup=get_main_keyboard())
-        await callback.answer()
         return
     ranges = get_available_ranges(mn, dates)
     await callback.message.edit_text("📅 " + mn + ". Выберите диапазон:", reply_markup=get_ranges_keyboard(mn, ranges))
-    await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("range:"))
 async def range_cb(callback: CallbackQuery):
+    await callback.answer()
     payload = callback.data.split(":", 1)[1]
     mn, rl = payload.split("|", 1)
     data = await asyncio.to_thread(get_api_data)
@@ -691,15 +690,14 @@ async def range_cb(callback: CallbackQuery):
     filtered = filter_by_range_label(dates, rl)
     if not filtered:
         await callback.message.edit_text("📭 В этом диапазоне нет дат.", reply_markup=get_main_keyboard())
-        await callback.answer()
         return
     total = (len(filtered) + DATES_PER_PAGE - 1) // DATES_PER_PAGE
     await callback.message.edit_text("📅 " + mn + ", " + rl + " — страница 1 из " + str(total) + ".\nВыберите день:", reply_markup=get_days_keyboard(mn, rl, filtered, page=1))
-    await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("page:"))
 async def page_cb(callback: CallbackQuery):
+    await callback.answer()
     payload = callback.data.split(":", 1)[1]
     mn, rl, page = payload.split("|")
     page = int(page)
@@ -708,17 +706,16 @@ async def page_cb(callback: CallbackQuery):
     filtered = filter_by_range_label(dates, rl)
     total = (len(filtered) + DATES_PER_PAGE - 1) // DATES_PER_PAGE
     await callback.message.edit_text("📅 " + mn + ", " + rl + " — страница " + str(page) + " из " + str(total) + ".\nВыберите день:", reply_markup=get_days_keyboard(mn, rl, filtered, page=page))
-    await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("back_ranges:"))
 async def back_ranges_cb(callback: CallbackQuery):
+    await callback.answer()
     mn = callback.data.split(":", 1)[1]
     data = await asyncio.to_thread(get_api_data)
     dates = data.get(mn, [])
     ranges = get_available_ranges(mn, dates)
     await callback.message.edit_text("📅 " + mn + ". Выберите диапазон:", reply_markup=get_ranges_keyboard(mn, ranges))
-    await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("date:"))
@@ -734,26 +731,24 @@ async def date_cb(callback: CallbackQuery):
 
 @dp.callback_query(lambda c: c.data == "quick:today")
 async def today_cb(callback: CallbackQuery):
+    await callback.answer()
     target = datetime.now()
     tables = await asyncio.to_thread(parse_schedule_for_date, target)
     if not tables:
         await callback.message.answer("📭 На сегодня нет расписания.", reply_markup=get_main_keyboard())
-        await callback.answer()
         return
     await callback.message.answer(format_multiple_tables(tables), reply_markup=get_main_keyboard())
-    await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data == "quick:tomorrow")
 async def tomorrow_cb(callback: CallbackQuery):
+    await callback.answer()
     target = datetime.now() + timedelta(days=1)
     tables = await asyncio.to_thread(parse_schedule_for_date, target)
     if not tables:
         await callback.message.answer("📭 На завтра нет расписания.", reply_markup=get_main_keyboard())
-        await callback.answer()
         return
     await callback.message.answer(format_multiple_tables(tables), reply_markup=get_main_keyboard())
-    await callback.answer()
 
 
 @dp.message(Command("lastlesson"))
@@ -774,11 +769,11 @@ async def lastlesson_handler(message: Message):
 
 @dp.callback_query(lambda c: c.data.startswith("lastles:"))
 async def lastles_cb(callback: CallbackQuery):
+    await callback.answer()
     subject = callback.data.split(":", 1)[1]
     date_key, lesson = await asyncio.to_thread(find_last_lesson, subject)
     if not lesson:
         await callback.message.answer("📚 " + subject + " — не найдено в истории.")
-        await callback.answer()
         return
     t = re.sub(r"\s+", " ", lesson["time"]).strip().replace(".", ":")
     t = re.sub(r"(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})", r"\1 – \2", t)
@@ -790,7 +785,6 @@ async def lastles_cb(callback: CallbackQuery):
         lines.append("🚪 " + parts[-1])
     msg = "\n".join(lines)
     await callback.message.answer(msg, reply_markup=get_main_keyboard())
-    await callback.answer()
 
 
 async def scheduler_loop():
