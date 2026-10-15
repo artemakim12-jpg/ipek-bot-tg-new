@@ -740,13 +740,16 @@ async def today_cb(callback: CallbackQuery):
     await callback.message.answer(format_multiple_tables(tables), reply_markup=get_main_keyboard())
 
 
-@dp.callback_query(lambda c: c.data == "quick:tomorrow")
-async def tomorrow_cb(callback: CallbackQuery):
-    await callback.answer()
-    target = datetime.now() + timedelta(days=1)
+@dp.callback_query(lambda c: c.data == "quick:today")
+async def today_cb(callback: CallbackQuery):
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+    target = datetime.now()
     tables = await asyncio.to_thread(parse_schedule_for_date, target)
     if not tables:
-        await callback.message.answer("📭 На завтра нет расписания.", reply_markup=get_main_keyboard())
+        await callback.message.answer("📭 На сегодня нет расписания.", reply_markup=get_main_keyboard())
         return
     await callback.message.answer(format_multiple_tables(tables), reply_markup=get_main_keyboard())
 
