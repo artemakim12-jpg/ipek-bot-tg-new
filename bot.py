@@ -25,6 +25,22 @@ API_URL = f"{BASE_URL}/api/get_list"
 CHECK_INTERVAL = 3600
 DAYS_AHEAD = 7
 CACHE_FILE = "/app/data/schedule_cache_v2.json"
+HISTORY_FILE = "/app/data/history.json"
+
+SUBJECTS = [
+    "Физкультура",
+    "ОАиП",
+    "ПиРИП",
+    "ИТ",
+    "Осн проект БД",
+    "Дискр матем с эл матем логики",
+    "ГДиМ",
+    "ОСиС",
+    "Эл высшей математики",
+    "ОК проф",
+    "Ин язык в ПД",
+    "Нем язык в ПД",
+]
 
 MONTHS_RU = {1: "января", 2: "февраля", 3: "марта", 4: "апреля", 5: "мая", 6: "июня", 7: "июля", 8: "августа", 9: "сентября", 10: "октября", 11: "ноября", 12: "декабря"}
 MONTHS_NOM_RU = {1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель", 5: "Май", 6: "Июнь", 7: "Июль", 8: "Август", 9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь"}
@@ -77,6 +93,33 @@ def save_cache():
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Ошибка сохранения кэша: {e}")
+
+def load_history():
+    if not os.path.exists(HISTORY_FILE):
+        return {}
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error("Ошибка загрузки истории: " + str(e))
+        return {}
+
+
+def save_history(history):
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error("Ошибка сохранения истории: " + str(e))
+
+
+def append_to_history(date_key, lessons):
+    history = load_history()
+    if date_key in history:
+        return
+    history[date_key] = lessons
+    save_history(history)
+    logger.info("В историю добавлен день: " + date_key)
 
 
 def get_last_day_of_month(month_name, year=None):
@@ -411,6 +454,19 @@ def format_table_from_lessons(title_key, lessons):
     lines.append("━━━━━━━━━━━━━━━━━")
     return "\n".join(lines)
 
+def find_last_lesson(subject):
+    history = load_history()
+    if not history:
+        return None, None
+    sorted_keys = sorted(history.keys(), key=lambda k: parse_date_key(k) or datetime.min, reverse=True)
+    for day_key in sorted_keys:
+        lessons = history.get(day_key, [])
+        for les in lessons:
+            content = les.get("content", "")
+            if subject.lower() in content.lower():
+                return day_key, les
+    return None, None
+
 
 def diff_snapshots(old, new):
     changes = []
@@ -456,6 +512,10 @@ def check_schedule_changes():
     changes, only_new = diff_snapshots(schedule_snapshot, new_snap)
     schedule_snapshot = new_snap
     save_cache()
+    today_key = datetime.now().strftime("%d.%m.%Y")
+    for day_key, lessons in schedule_snapshot.items():
+        if day_key < today_key:
+            append_to_history(day_key, lessons)
     if not changes:
         logger.info("Изменений нет.")
         return
@@ -471,7 +531,6 @@ def check_schedule_changes():
         logger.info("Уведомление отправлено.")
     except Exception as e:
         logger.error("Ошибка отправки: " + str(e))
-
 
 def format_single_table(title, lessons):
     lines = ["━━━━━━━━━━━━━━━━━", "📅 Расписание · " + TARGET_GROUP]
@@ -697,9 +756,40 @@ async def tomorrow_cb(callback: CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query(lambda c: c.data == "distance")
-async def distance_cb(callback: CallbackQuery):
-    await callback.message.edit_text(format_distance_message(), reply_markup=get_distance_keyboard())
+@dp.message(Command("lastlesson"))
+async def lastlesson_handler(message: Message):
+    rows = []
+    row = []
+    for subj in SUBJECTS:
+        row.append(InlineKeyboardButton(text=subj, callback_data="lastles:" + subj))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton(text="🏠 В меню", callback_data="main_menu")])
+    kb = InlineKeyboardMarkup(inline_keyboard=rows)
+    await message.answer("📚 Выберите предмет:", reply_markup=kb)
+
+
+@dp.callback_query(lambda c: c.data.startswith("lastles:"))
+async def lastles_cb(callback: CallbackQuery):
+    subject = callback.data.split(":", 1)[1]
+    date_key, lesson = await asyncio.to_thread(find_last_lesson, subject)
+    if not lesson:
+        await callback.message.answer("📚 " + subject + " — не найдено в истории.")
+        await callback.answer()
+        return
+    t = re.sub(r"\s+", " ", lesson["time"]).strip().replace(".", ":")
+    t = re.sub(r"(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})", r"\1 – \2", t)
+    parts = [p.strip() for p in lesson["content"].split(" / ") if p.strip()]
+    lines = ["📚 " + subject, "", "📆 " + date_key, "🕙 " + t]
+    if len(parts) > 1:
+        lines.append("👤 " + parts[1])
+    if len(parts) > 2:
+        lines.append("🚪 " + parts[-1])
+    msg = "\n".join(lines)
+    await callback.message.answer(msg, reply_markup=get_main_keyboard())
     await callback.answer()
 
 
